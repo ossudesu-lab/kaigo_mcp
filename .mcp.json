@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "kaigo-gap": {
+      "command": "python",
+      "args": ["-m", "kaigo_mcp"],
+      "cwd": "C:\projects\kaigo_mcp"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# 実行ごとのコスト記録。手元の計測結果なので共有しない（案1と同じ扱い）。
+.agent-usage.jsonl

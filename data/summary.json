@@ -1,0 +1,37 @@
+{
+  "insurers": 1571,
+  "municipalities": 1741,
+  "unions": 40,
+  "nationalPer100": 24.6,
+  "nationalCapacity": 576442,
+  "kaigo3Total": 2340956,
+  "ninteiTotal": 6818244,
+  "median": 26.7,
+  "p25": 20.3,
+  "p75": 36.3,
+  "p10": 14.2,
+  "p90": 54.9,
+  "zeroCapacity": 90,
+  "staffCorr": -0.257,
+  "staffMin": {
+    "name": "埼玉県",
+    "value": 51.1,
+    "per100": 32.2
+  },
+  "staffMax": {
+    "name": "青森県",
+    "value": 78.7,
+    "per100": 18.3
+  },
+  "sizedCount": 1082,
+  "minKaigo3": 300,
+  "yuryoCorr": -0.155,
+  "bothThin": 226,
+  "medianTokuyoSized": 24.7,
+  "medianYuryoSized": 15.1,
+  "ninteiRateMedian": 18.5,
+  "ninteiRateP10": 15.0,
+  "ninteiRateP90": 22.4,
+  "evacuationCount": 6,
+  "year": "2020"
+}
