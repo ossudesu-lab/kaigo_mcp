@@ -88,6 +88,75 @@ def totals(path: Path = LOG_PATH) -> dict[str, Any]:
     return {"runs": runs, "usd": usd, "unpriced": unpriced}
 
 
+# 実績が無いモデルを見積もるときの既定プロファイル。
+# 列B（qwen3.5:9b / num_ctx 8192）で「青森県で特養が足りない市町村を3つ挙げて…」を
+# 完走させたときの実測値。3ステップぶんの合計。
+# 楽な質問（尼崎市）は 3,176 / 601 だったので、これはやや重い側の想定。
+DEFAULT_PROFILE = (3702, 1010)
+
+
+def estimate(model: str, requests: int, path: Path = LOG_PATH) -> dict[str, Any]:
+    """これから `requests` 回まわすといくらか。
+
+    同じモデルの実績がログにあればそれを使う。無ければ既定プロファイル。
+    **推定であって請求額ではない。** 桁を間違えないためのもの。
+    """
+    samples = []
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if row.get("model") == model and row.get("input"):
+                samples.append((row["input"], row["output"]))
+
+    if samples:
+        per_in = sum(s[0] for s in samples) / len(samples)
+        per_out = sum(s[1] for s in samples) / len(samples)
+        basis = f"このモデルの実績{len(samples)}回の平均"
+    else:
+        per_in, per_out = DEFAULT_PROFILE
+        basis = "既定プロファイル（実績が無いため）"
+
+    usd = cost_usd(model, int(per_in * requests), int(per_out * requests))
+    return {
+        "requests": requests,
+        "per_input": int(per_in),
+        "per_output": int(per_out),
+        "usd": usd,
+        "basis": basis,
+    }
+
+
+def print_preflight(model: str, requests: int, path: Path = LOG_PATH) -> None:
+    """課金しうる実行の前に、見積もりと累計を必ず目に入れる。
+
+    案1では1回ごとのコストは表示していたのに**累計**を出しておらず、
+    「1回数十円」を何十回も回してクレジットを使い切り、公開中の本番が止まった。
+    見えていなかったのは累計のほう。だから両方出す。
+    """
+    est = estimate(model, requests, path)
+    tot = totals(path)
+    print(f"── 実行前の見積もり（{model}）")
+    print(f"   {requests}回 × 入力{est['per_input']:,} / 出力{est['per_output']:,} トークン")
+    print(f"   根拠: {est['basis']}")
+    if est["usd"] is None:
+        print("   今回の想定: 単価不明。金額は出せない")
+    elif est["usd"] == 0:
+        print("   今回の想定: 0円（ローカル実行）")
+    else:
+        print(f"   今回の想定: ${est['usd']:.2f}（約{yen(est['usd']):,.0f}円）")
+    print(
+        f"   これまでの累計: {tot['runs']}回・約${tot['usd']:.2f}"
+        f"（約{yen(tot['usd']):,.0f}円）"
+    )
+    if est["usd"]:
+        print("   Anthropicの残高は公開中の本番と共有。回す前に残高を確認すること。")
+
+
 def format_cost(record: RunRecord, path: Path = LOG_PATH) -> str:
     usd = cost_usd(record.model, record.input_tokens, record.output_tokens)
     tot = totals(path)
