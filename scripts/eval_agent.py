@@ -26,6 +26,7 @@ import json
 import re
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 # ひらがな・カタカナ。漢字は入れない（中国語の回答と区別できなくなるため）。
@@ -41,6 +42,72 @@ from kaigo_mcp.agent.loop import DEFAULT_MAX_STEPS, run_agent  # noqa: E402
 from kaigo_mcp.agent.types import RunRecord  # noqa: E402
 
 CASES_PATH = ROOT / "eval-cases.json"
+RESULTS_DIR = ROOT / "eval-results"
+
+
+def save_results(column: str, results: list["CaseResult"]) -> Path:
+    """答えごと保存する。判定を直したときに再採点だけで済ませるため。
+
+    判定はこれまでに4回直している。そのたびに走らせ直していたら、
+    課金列では1回25円かかる。答えが残っていれば再採点はタダ。
+    """
+    RESULTS_DIR.mkdir(exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    path = RESULTS_DIR / f"{column}-{stamp}.json"
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    "case_id": r.case_id,
+                    "model": r.record.model if r.record else "",
+                    "question": r.record.question if r.record else "",
+                    "answer": r.record.answer if r.record else "",
+                    "tool_calls": r.record.tool_calls if r.record else [],
+                    "steps": r.record.steps if r.record else 0,
+                    "stopped_by": r.record.stopped_by if r.record else "",
+                    "stop_reason": r.record.stop_reason if r.record else "",
+                    "input_tokens": r.record.input_tokens if r.record else 0,
+                    "output_tokens": r.record.output_tokens if r.record else 0,
+                    "seconds": r.record.seconds if r.record else 0.0,
+                }
+                for r in results
+            ],
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def load_results(path: Path) -> list["CaseResult"]:
+    """保存した結果を読み、いまの判定で採点し直す。"""
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    cases = {
+        c["id"]: c
+        for c in json.loads(CASES_PATH.read_text(encoding="utf-8"))["cases"]
+    }
+    out: list[CaseResult] = []
+    for row in rows:
+        record = RunRecord(
+            backend="saved",
+            model=row["model"],
+            question=row["question"],
+            answer=row["answer"],
+            tool_calls=row["tool_calls"],
+            steps=row["steps"],
+            stopped_by=row["stopped_by"],
+            stop_reason=row["stop_reason"],
+            input_tokens=row["input_tokens"],
+            output_tokens=row["output_tokens"],
+            seconds=row["seconds"],
+        )
+        case = cases.get(row["case_id"])
+        failures = check(case, record) if case else ["ケース定義が無い"]
+        out.append(
+            CaseResult(row["case_id"], not failures, failures, record)
+        )
+    return out
 
 
 @dataclass
@@ -188,11 +255,34 @@ def main() -> int:
     parser.add_argument("--case", help="このIDのケースだけ走らせる")
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument(
+        "--rescore", type=Path, help="保存済みの結果を、いまの判定で採点し直す（無料）"
+    )
+    parser.add_argument(
         "--yes", action="store_true", help="課金の発生する列を実際に走らせる"
     )
     args = parser.parse_args()
 
     load_env()  # 課金列のキーは .env から読む
+
+    data_all = json.loads(CASES_PATH.read_text(encoding="utf-8"))
+    if args.rescore:
+        # モデルを回さない。判定を直したときはこちらで確かめる。
+        results = load_results(args.rescore)
+        print(f"再採点: {args.rescore}（{len(results)}件・課金なし）\n")
+        for r in results:
+            if not r.passed:
+                print(f"  NG {r.case_id}")
+                for f in r.failures:
+                    print(f"       - {f}")
+        ids = {r.case_id for r in results}
+        # 周回数は保存された件数から数える。--runs の既定値(3)を使うと、
+        # 1周しか保存されていない結果に「3周すべて通った」と表示してしまう。
+        counts = [sum(1 for r in results if r.case_id == i) for i in ids]
+        return summarize(
+            results,
+            [c for c in data_all["cases"] if c["id"] in ids],
+            max(counts) if counts else 0,
+        )
 
     data = json.loads(CASES_PATH.read_text(encoding="utf-8"))
     cases = data["cases"]
@@ -228,6 +318,9 @@ def main() -> int:
         print(f"列を作れない: {exc}", file=sys.stderr)
         return 1
 
+    saved = save_results(args.column, results)
+    print(f"\n結果を保存: {saved.relative_to(ROOT)}")
+    print("  判定を直したら --rescore で採点し直せる（課金なし）")
     return summarize(results, cases, args.runs)
 
 
