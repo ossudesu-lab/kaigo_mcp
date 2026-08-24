@@ -76,6 +76,7 @@ def main() -> int:
 
     ok = 0
     seconds: list[float] = []
+    followed_instruction = 0
     for i in range(args.runs):
         kwargs = {} if args.temperature is None else {"temperature": args.temperature}
         started = time.monotonic()
@@ -89,22 +90,41 @@ def main() -> int:
             ],
             **kwargs,
         )
-        seconds.append(time.monotonic() - started)
+        elapsed = time.monotonic() - started
+        seconds.append(elapsed)
         message = res.choices[0].message
         if message.tool_calls:
             ok += 1
             names = [c.function.name for c in message.tool_calls]
-            print(f"  {i + 1}. OK {names}")
+            # システムプロンプトは「答える前に基準値を確認」と指示している。
+            # 従うかどうかは安定性とは別の軸（指示追従）なので、分けて数える。
+            if "get_national_baseline" in names:
+                followed_instruction += 1
+            print(f"  {i + 1}. OK {elapsed:5.1f}秒 {names}")
         else:
             leaked = (message.content or "").strip().replace("\n", " ")
-            print(f"  {i + 1}. NG テキストに漏れた: {leaked[:90]}")
+            print(f"  {i + 1}. NG {elapsed:5.1f}秒 テキストに漏れた: {leaked[:80]}")
 
     rate = ok / args.runs
     print(f"\n道具呼び出し成功率: {ok}/{args.runs} = {rate:.0%}")
     # 多段ループでは連続成功が要る。1回あたりの率だけ見ると実力を過大評価する。
     for steps in (2, 3):
         print(f"  {steps}ステップ連続で成功する確率: {rate ** steps:.0%}")
-    print(f"1回あたり {statistics.mean(seconds):.1f}秒")
+
+    print(
+        f"指示追従（基準値を先に引いたか）: "
+        f"{followed_instruction}/{args.runs} = {followed_instruction / args.runs:.0%}"
+    )
+
+    # 平均だけ出すと、1回目のモデルロードが混ざって温度やハードの差に見える。
+    # 中央値と、1回目を除いた平均を併記して切り分けられるようにする。
+    warm = seconds[1:] or seconds
+    print(
+        f"秒: 中央値 {statistics.median(seconds):.1f}"
+        f" / 平均 {statistics.mean(seconds):.1f}"
+        f" / 初回 {seconds[0]:.1f}"
+        f" / 初回を除く平均 {statistics.mean(warm):.1f}"
+    )
     return 0
 
 
