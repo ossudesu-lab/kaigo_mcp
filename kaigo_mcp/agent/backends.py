@@ -237,7 +237,21 @@ PRESETS: dict[str, dict[str, Any]] = {
         "backend": "openai_compat",
         "model": "qwen3.5:9b",
         "base_url": "http://localhost:11434/v1",
-        "note": "ゲーミングノート RTX 5050 8GB。要 ollama pull",
+        "note": "ゲーミングノート RTX 5050 8GB。ollama の既定 num_ctx=4096",
+    },
+    # 既定の num_ctx=4096 だと、尼崎市の質問で4回とも空答えになった。
+    # 誤った引数で該当0になり、回復しようとして 2,946 トークン考え込み、
+    # 答えを書き始める前にコンテキストを使い切る。8k にすると解消するが、
+    # 今度は 8GB VRAM に載りきらず `ollama ps` が 12%/88% CPU/GPU を出す。
+    #
+    # **両方を列として持つ。** どちらか一方だけで測ると、
+    # モデルの性質と設定の問題を取り違える。
+    #   ollama create qwen3.5:9b-ctx8k -f Modelfile   （PARAMETER num_ctx 8192）
+    "B-local-gpu-ctx8k": {
+        "backend": "openai_compat",
+        "model": "qwen3.5:9b-ctx8k",
+        "base_url": "http://localhost:11434/v1",
+        "note": "同じ9Bを num_ctx 8192 で。要 ollama create",
     },
     # 列Bのローカル qwen3.5:9b と**同じ3.5世代**を選んでいる。
     # 当初は Qwen3-235B-A22B を指していたが、世代が3.0で列Bと揃わないうえ、

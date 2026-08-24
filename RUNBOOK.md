@@ -190,6 +190,58 @@ CLI は理由と `num_ctx` の可能性を出し、**終了コード1**を返す
 
 ---
 
+## 2-3. 次にやること: eval を列Bで回す（無料）
+
+まず `git pull`。前回のあと eval を作ったので、**列Bだけ同じ物差しで測れていない**。
+列A（CPU）と列D（Claude Haiku）は eval 済みで、ここが埋まると表が揃う。
+
+```
+python scripts/eval_agent.py --column B-local-gpu --runs 3
+python scripts/eval_agent.py --column B-local-gpu-ctx8k --runs 3
+```
+
+**2本とも回す。** 既定の `num_ctx=4096` では尼崎市の質問が4回とも空答えになった。
+片方だけ測ると、モデルの性質と設定の問題を取り違える。
+
+8k の列は先に作っておく必要がある。
+
+```
+ollama create qwen3.5:9b-ctx8k -f Modelfile
+```
+
+`Modelfile` の中身:
+
+```
+FROM qwen3.5:9b
+PARAMETER num_ctx 8192
+```
+
+### 比較の相手
+
+| | 列A 7B (CPU) | 列D Haiku 4.5 |
+| --- | --- | --- |
+| 正答 | 5/6 = 83% | 15/18 = 83% |
+| 完走 | 6/6 = 100% | 18/18 = 100% |
+| 指示追従 | 2/6 = 33% | 17/18 = 94% |
+| 1問の秒数 | 72〜85秒 | 6.5〜8.5秒 |
+
+列Aは道具の説明文から全国値を拾って偶然当てていて、基準値を引いていない。
+列Dは毎回引く。**9B がどちらに近いか**が見どころ。
+
+### 落ちたケースの扱い
+
+eval は不合格の理由と答えを表示する。**判定のバグかモデルの不具合か、
+まず切り分けること。** これまで両方あった（判定側の誤りが4件）。
+
+答えは `eval-results/` に保存されるので、判定を直したあとは走らせ直さずに
+再採点できる。
+
+```
+python scripts/eval_agent.py --rescore eval-results/B-local-gpu-<日時>.json
+```
+
+---
+
 ## 3. 結果の持ち帰り方
 
 `.agent-usage.jsonl` に実行記録が溜まるが、**これは .gitignore されている**
