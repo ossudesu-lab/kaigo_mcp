@@ -23,9 +23,13 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
+# ひらがな・カタカナ。漢字は入れない（中国語の回答と区別できなくなるため）。
+KANA = re.compile(r"[぀-ゟ゠-ヿ]")
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -57,6 +61,13 @@ def check(case: dict, record: RunRecord) -> list[str]:
 
     answer = record.answer
     called = set(record.tool_calls)
+
+    # 全ケース共通。qwen2.5:7b は迷うと中国語で答えることがある
+    # （「架空市は特養が足りてる？」で実際に発生した）。
+    # 日本の介護制度を日本語で説明する道具なので、これは内容以前の不合格。
+    # 漢字だけでは中国語と区別できないので、かなの有無で見る。
+    if not KANA.search(answer):
+        failures.append("日本語で答えていない（かなが1文字も無い）")
 
     for name in case.get("must_call", []):
         if name not in called:
