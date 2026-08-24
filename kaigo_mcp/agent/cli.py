@@ -13,6 +13,7 @@ import sys
 
 from . import usage
 from .backends import PRESETS, BackendError, build
+from .env import load_env
 from .loop import DEFAULT_MAX_STEPS, run_agent
 
 
@@ -35,6 +36,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--verbose", action="store_true", help="道具の呼び出しを表示")
     parser.add_argument("--list", action="store_true", help="列の一覧")
     args = parser.parse_args(argv)
+
+    load_env()  # 課金列のキーは .env から読む
 
     if args.list:
         _list_columns()

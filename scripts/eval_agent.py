@@ -36,6 +36,7 @@ sys.path.insert(0, str(ROOT))
 
 from kaigo_mcp.agent import usage  # noqa: E402
 from kaigo_mcp.agent.backends import PRESETS, BackendError, build  # noqa: E402
+from kaigo_mcp.agent.env import load_env  # noqa: E402
 from kaigo_mcp.agent.loop import DEFAULT_MAX_STEPS, run_agent  # noqa: E402
 from kaigo_mcp.agent.types import RunRecord  # noqa: E402
 
@@ -190,6 +191,8 @@ def main() -> int:
         "--yes", action="store_true", help="課金の発生する列を実際に走らせる"
     )
     args = parser.parse_args()
+
+    load_env()  # 課金列のキーは .env から読む
 
     data = json.loads(CASES_PATH.read_text(encoding="utf-8"))
     cases = data["cases"]
