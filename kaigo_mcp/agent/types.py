@@ -70,5 +70,11 @@ class RunRecord:
     input_tokens: int = 0
     output_tokens: int = 0
     seconds: float = 0.0
-    stopped_by: str = ""  # end / max_steps / error
+    stopped_by: str = ""  # end / truncated / max_steps / error
+    stop_reason: str = ""  # 最後の往復でバックエンドが返した理由。truncated の内訳用
     error: str = ""
+
+    @property
+    def answered(self) -> bool:
+        """答えが出たか。列どうしを比べるとき、数えて良いのはこれが真の実行だけ。"""
+        return self.stopped_by == "end"

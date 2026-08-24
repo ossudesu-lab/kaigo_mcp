@@ -60,6 +60,7 @@ def append(record: RunRecord, path: Path = LOG_PATH) -> None:
         "output": record.output_tokens,
         "seconds": record.seconds,
         "stopped_by": record.stopped_by,
+        "stop_reason": record.stop_reason,
         "usd": usd,
     }
     with path.open("a", encoding="utf-8") as f:

@@ -78,7 +78,16 @@ async def run_agent(
 
                     if not reply.tool_calls:
                         record.answer = reply.text
-                        record.stopped_by = "end"
+                        record.stop_reason = reply.stop_reason
+                        # 生成が上限で切れると、道具呼び出しも本文も無い形で返る。
+                        # これを "end" にすると、答えの出ていない実行が完走と同じ形で
+                        # 残り、列どうしの比較が壊れる（列Bの9Bで4回とも起きた。
+                        # 誤った引数で該当0になり、考え込んだままコンテキストを
+                        # 使い切って、出力3,121トークンで本文が空だった）。
+                        if reply.stop_reason == "length" or not reply.text.strip():
+                            record.stopped_by = "truncated"
+                        else:
+                            record.stopped_by = "end"
                         break
 
                     history.append(

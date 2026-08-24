@@ -60,6 +60,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"失敗: {record.error}")
     elif record.stopped_by == "max_steps":
         print(f"上限{args.max_steps}ステップに到達して打ち切り。答えは出ていない。")
+    elif record.stopped_by == "truncated":
+        why = record.stop_reason or "本文が空"
+        print(f"生成が途中で切れた（{why}）。答えは出ていない。完走として数えないこと。")
+        print("ローカルなら num_ctx が足りていない可能性が高い。")
+        if record.answer.strip():
+            print()
+            print("切れる前の本文:")
+            print(record.answer)
     else:
         print(record.answer)
 
