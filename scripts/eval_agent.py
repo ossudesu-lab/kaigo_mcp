@@ -85,6 +85,18 @@ def check(case: dict, record: RunRecord) -> list[str]:
         if text in answer:
             failures.append(f"「{text}」が答えに含まれている")
 
+    # 文字列一致だけだと、言い回しが1文字ずれただけで抜ける。
+    # 「伊勢市のほうが入りにくい」を禁止していたのに
+    # 「伊勢市の方が入りにくい」で誤答が合格した（ほう / 方）。
+    # 誤りを禁止する側は、表記ゆれを吸える形で書けないと役に立たない。
+    for pattern in case.get("must_not_match", []):
+        if re.search(pattern, answer):
+            failures.append(f"禁止パターン /{pattern}/ に一致した")
+
+    for pattern in case.get("must_match", []):
+        if not re.search(pattern, answer):
+            failures.append(f"必須パターン /{pattern}/ に一致しない")
+
     return failures
 
 
