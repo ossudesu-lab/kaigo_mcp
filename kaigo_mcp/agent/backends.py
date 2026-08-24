@@ -251,17 +251,24 @@ PRESETS: dict[str, dict[str, Any]] = {
     # ローカルの qwen3.5:9b と比べるときは条件が揃っているか確認すること。
     "C-open-api": {
         "backend": "openai_compat",
-        "model": "qwen/qwen3.5-397b-a17b",
-        "base_url": "https://integrate.api.nvidia.com/v1",
-        "api_key_env": "NVIDIA_API_KEY",
-        "note": "NVIDIA無料枠。列Bと同世代・サイズ違い。クレカ不要",
-    },
-    "C-alt-deepinfra": {
-        "backend": "openai_compat",
         "model": "Qwen/Qwen3.5-397B-A17B",
         "base_url": "https://api.deepinfra.com/v1/openai",
         "api_key_env": "DEEPINFRA_API_KEY",
-        "note": "列Cと同じモデルを有料で。NVIDIAが詰まったときの代替",
+        "note": "列Bと同世代・サイズ違い（9B→397B）。従量課金・18回で約15円",
+    },
+    # NVIDIA無料枠。**速度が保証されない**ので既定にはしていない。
+    # 2026-08-24 に実測: 単発は数秒で返ることもあるが、1往復に168秒かかる回があり、
+    # 連続すると全滅する（6回の呼び出しが280秒で終わらなかった）。共有キャパのため。
+    # 18回×2〜3往復のevalには使えない。単発の試し打ち用として残す。
+    #
+    # なお同じ Qwen3.5-397B-A17B は NVIDIA では 2026-07-27 に提供終了している（410）。
+    # 無料枠のカタログは入れ替わるので、使う前に必ず /models で実在を確かめること。
+    "C-alt-nvidia": {
+        "backend": "openai_compat",
+        "model": "deepseek-ai/deepseek-v4-flash-0731",
+        "base_url": "https://integrate.api.nvidia.com/v1",
+        "api_key_env": "NVIDIA_API_KEY",
+        "note": "NVIDIA無料枠。無料だが待たされる。evalには不向き",
     },
     "D-claude": {
         "backend": "anthropic",

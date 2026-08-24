@@ -43,6 +43,23 @@ DEFAULT_MAX_STEPS = 6
 TRUNCATED_REASONS = frozenset({"length", "max_tokens"})
 
 
+def _describe(exc: BaseException, depth: int = 0) -> str:
+    """例外を、原因が分かる形の文字列にする。
+
+    stdio_client は anyio のタスクグループを使うので、失敗が ExceptionGroup に
+    包まれる。そのまま `type(exc).__name__: exc` にすると
+    「ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)」しか残らず、
+    本当の原因（例: モデルが提供終了で410）が消える。実際にこれで一度詰まった。
+    """
+    if isinstance(exc, BaseExceptionGroup) and depth < 3:
+        inner = "; ".join(_describe(e, depth + 1) for e in exc.exceptions)
+        return inner or f"{type(exc).__name__}: {exc}"
+    text = f"{type(exc).__name__}: {exc}"
+    if exc.__cause__ is not None and depth < 3:
+        text += f" <- {_describe(exc.__cause__, depth + 1)}"
+    return text
+
+
 def _to_specs(mcp_tools: Any) -> list[ToolSpec]:
     return [
         ToolSpec(name=t.name, description=t.description or "", schema=t.input_schema)
@@ -154,7 +171,7 @@ async def run_agent(
 
     except Exception as exc:
         record.stopped_by = "error"
-        record.error = f"{type(exc).__name__}: {exc}"
+        record.error = _describe(exc)
 
     record.seconds = round(time.monotonic() - started, 2)
     return record

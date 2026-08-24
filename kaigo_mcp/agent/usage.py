@@ -31,7 +31,8 @@ PRICE: dict[str, tuple[float, float]] = {
     "Qwen/Qwen3.5-397B-A17B": (0.54, 3.40),
     # NVIDIA の無料枠。金額は発生しないが**クレジットは減る**（初期1,000程度）。
     # 0円と出るからといって無制限ではないので、回数は意識すること。
-    "qwen/qwen3.5-397b-a17b": (0.0, 0.0),
+    "deepseek-ai/deepseek-v4-flash-0731": (0.0, 0.0),
+    "moonshotai/kimi-k3": (0.0, 0.0),
 }
 
 USD_JPY = 150  # 目安。正確な請求額ではない。
@@ -41,7 +42,8 @@ USD_JPY = 150  # 目安。正確な請求額ではない。
 # 案1の事故は「見えていない上限がある」ことに気づかなかったのが原因なので、
 # 0円の中身を分けて表示する。
 FREE_TIER = {
-    "qwen/qwen3.5-397b-a17b": "NVIDIA無料枠（初期1,000クレジット・40req/分）",
+    "deepseek-ai/deepseek-v4-flash-0731": "NVIDIA無料枠（初期1,000クレジット・40req/分）",
+    "moonshotai/kimi-k3": "NVIDIA無料枠（初期1,000クレジット・40req/分）",
 }
 
 
