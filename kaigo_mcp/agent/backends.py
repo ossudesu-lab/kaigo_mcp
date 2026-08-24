@@ -239,12 +239,16 @@ PRESETS: dict[str, dict[str, Any]] = {
         "base_url": "http://localhost:11434/v1",
         "note": "ゲーミングノート RTX 5050 8GB。要 ollama pull",
     },
+    # 列Bのローカル qwen3.5:9b と**同じ3.5世代**を選んでいる。
+    # 当初は Qwen3-235B-A22B を指していたが、世代が3.0で列Bと揃わないうえ、
+    # DeepInfra のカタログからも消えていた（Instruct-2507 に置き換わったのち、
+    # 3.5系に世代交代）。9B → 397B なら差がサイズだけになる。
     "C-open-api": {
         "backend": "openai_compat",
-        "model": "Qwen/Qwen3-235B-A22B-Instruct",
+        "model": "Qwen/Qwen3.5-397B-A17B",
         "base_url": "https://api.deepinfra.com/v1/openai",
         "api_key_env": "DEEPINFRA_API_KEY",
-        "note": "オープンモデルをホスティング経由で",
+        "note": "オープンモデルをホスティング経由で。列Bと同世代・サイズ違い",
     },
     "D-claude": {
         "backend": "anthropic",
