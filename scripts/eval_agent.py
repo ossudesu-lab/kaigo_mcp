@@ -114,6 +114,11 @@ async def run_all(
             )
             for f in failures:
                 print(f"       - {f}")
+            # 落ちた回は答えも出す。これが無いと、なぜ落ちたのかを調べるのに
+            # 毎回走らせ直すことになる（ローカルだと1回3分かかる）。
+            if failures and record.answer.strip():
+                body = record.answer.strip().replace("\n", " ")
+                print(f"       答え: {body[:200]}")
     return results
 
 
