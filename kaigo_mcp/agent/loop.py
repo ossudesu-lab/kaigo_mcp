@@ -35,6 +35,13 @@ SYSTEM = """あなたは日本の介護保険の需給データに答えるア�
 # 上限が無いと1問で延々とトークンを消費しうる。コスト事故の最後の壁。
 DEFAULT_MAX_STEPS = 6
 
+# 「生成が上限で切れた」を表す値は各社で違う。
+# OpenAI互換は "length"、Anthropic は "max_tokens"。
+# 片方しか見ていないと、もう片方の列では切れたことを検出できず、
+# 答えの出ていない実行が完走として集計に混ざる。
+# 列Bで空答えを完走と数えていたのと同じ壊れ方が、列Dで再発する。
+TRUNCATED_REASONS = frozenset({"length", "max_tokens"})
+
 
 def _to_specs(mcp_tools: Any) -> list[ToolSpec]:
     return [
@@ -76,18 +83,27 @@ async def run_agent(
                     record.input_tokens += reply.input_tokens
                     record.output_tokens += reply.output_tokens
 
+                    # 生成が上限で切れたら、道具呼び出しの有無に関わらず打ち切る。
+                    # これを "end" にすると、答えの出ていない実行が完走と同じ形で
+                    # 残り、列どうしの比較が壊れる（列Bの9Bで4回とも起きた。
+                    # 誤った引数で該当0になり、考え込んだままコンテキストを
+                    # 使い切って、出力3,121トークンで本文が空だった）。
+                    #
+                    # 道具呼び出しの途中で切れる場合もある。引数のJSONが欠けたまま
+                    # 次のステップへ進むと、道具が失敗した記録だけが残り、
+                    # 原因が「モデルが下手」に見えてしまうので、ここで止める。
+                    if reply.stop_reason in TRUNCATED_REASONS:
+                        record.answer = reply.text
+                        record.stop_reason = reply.stop_reason
+                        record.stopped_by = "truncated"
+                        break
+
                     if not reply.tool_calls:
                         record.answer = reply.text
                         record.stop_reason = reply.stop_reason
-                        # 生成が上限で切れると、道具呼び出しも本文も無い形で返る。
-                        # これを "end" にすると、答えの出ていない実行が完走と同じ形で
-                        # 残り、列どうしの比較が壊れる（列Bの9Bで4回とも起きた。
-                        # 誤った引数で該当0になり、考え込んだままコンテキストを
-                        # 使い切って、出力3,121トークンで本文が空だった）。
-                        if reply.stop_reason == "length" or not reply.text.strip():
-                            record.stopped_by = "truncated"
-                        else:
-                            record.stopped_by = "end"
+                        record.stopped_by = (
+                            "end" if reply.text.strip() else "truncated"
+                        )
                         break
 
                     history.append(
