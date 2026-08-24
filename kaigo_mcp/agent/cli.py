@@ -13,7 +13,7 @@ import sys
 
 from . import usage
 from .backends import PRESETS, BackendError, build
-from .env import load_env
+from .env import load_env_checked
 from .loop import DEFAULT_MAX_STEPS, run_agent
 
 
@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--list", action="store_true", help="列の一覧")
     args = parser.parse_args(argv)
 
-    load_env()  # 課金列のキーは .env から読む
+    load_env_checked()  # 課金列のキーは .env から読む
 
     if args.list:
         _list_columns()
