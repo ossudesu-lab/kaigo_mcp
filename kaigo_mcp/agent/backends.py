@@ -241,14 +241,27 @@ PRESETS: dict[str, dict[str, Any]] = {
     },
     # 列Bのローカル qwen3.5:9b と**同じ3.5世代**を選んでいる。
     # 当初は Qwen3-235B-A22B を指していたが、世代が3.0で列Bと揃わないうえ、
-    # DeepInfra のカタログからも消えていた（Instruct-2507 に置き換わったのち、
-    # 3.5系に世代交代）。9B → 397B なら差がサイズだけになる。
+    # DeepInfra のカタログからも消えていた。9B → 397B なら差がサイズだけになる。
+    #
+    # 同じモデルを NVIDIA が無料で配っているのでそちらを既定にした
+    # （クレカ不要・クレジット制。build.nvidia.com で発行）。
+    # DeepInfra は同じモデルを有料で持っているので代替として残す。
+    #
+    # 注意: このモデルは既定で thinking モードで動く。思考ぶんの出力が増えるので、
+    # ローカルの qwen3.5:9b と比べるときは条件が揃っているか確認すること。
     "C-open-api": {
+        "backend": "openai_compat",
+        "model": "qwen/qwen3.5-397b-a17b",
+        "base_url": "https://integrate.api.nvidia.com/v1",
+        "api_key_env": "NVIDIA_API_KEY",
+        "note": "NVIDIA無料枠。列Bと同世代・サイズ違い。クレカ不要",
+    },
+    "C-alt-deepinfra": {
         "backend": "openai_compat",
         "model": "Qwen/Qwen3.5-397B-A17B",
         "base_url": "https://api.deepinfra.com/v1/openai",
         "api_key_env": "DEEPINFRA_API_KEY",
-        "note": "オープンモデルをホスティング経由で。列Bと同世代・サイズ違い",
+        "note": "列Cと同じモデルを有料で。NVIDIAが詰まったときの代替",
     },
     "D-claude": {
         "backend": "anthropic",

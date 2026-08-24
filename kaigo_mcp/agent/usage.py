@@ -29,9 +29,20 @@ PRICE: dict[str, tuple[float, float]] = {
     # 食い違うときは**高いほう**を入れる。見積もりが実際より安く出るのが
     # 一番まずい（残高は公開中の本番と共有しているため）。
     "Qwen/Qwen3.5-397B-A17B": (0.54, 3.40),
+    # NVIDIA の無料枠。金額は発生しないが**クレジットは減る**（初期1,000程度）。
+    # 0円と出るからといって無制限ではないので、回数は意識すること。
+    "qwen/qwen3.5-397b-a17b": (0.0, 0.0),
 }
 
 USD_JPY = 150  # 目安。正確な請求額ではない。
+
+# 金銭は発生しないが**無制限ではない**エンドポイント。
+# ローカル実行と同じ「0円」で括ると、クレジットを使い切るまで気づけない。
+# 案1の事故は「見えていない上限がある」ことに気づかなかったのが原因なので、
+# 0円の中身を分けて表示する。
+FREE_TIER = {
+    "qwen/qwen3.5-397b-a17b": "NVIDIA無料枠（初期1,000クレジット・40req/分）",
+}
 
 
 def is_local(model: str) -> bool:
@@ -148,16 +159,24 @@ def print_preflight(model: str, requests: int, path: Path = LOG_PATH) -> None:
     print(f"   根拠: {est['basis']}")
     if est["usd"] is None:
         print("   今回の想定: 単価不明。金額は出せない")
+    elif is_local(model):
+        print("   今回の想定: 0円（ローカル実行・上限なし）")
+    elif model in FREE_TIER:
+        # 0円だが無制限ではない。ここを混ぜると上限に気づけない。
+        print(f"   今回の想定: 0円 — ただし {FREE_TIER[model]} を消費する")
     elif est["usd"] == 0:
-        print("   今回の想定: 0円（ローカル実行）")
+        print("   今回の想定: 0円")
     else:
         print(f"   今回の想定: ${est['usd']:.2f}（約{yen(est['usd']):,.0f}円）")
     print(
         f"   これまでの累計: {tot['runs']}回・約${tot['usd']:.2f}"
         f"（約{yen(tot['usd']):,.0f}円）"
     )
-    if est["usd"]:
+    # 警告は当たる相手にだけ出す。全部に出すと読み飛ばされる。
+    if est["usd"] and model.startswith("claude-"):
         print("   Anthropicの残高は公開中の本番と共有。回す前に残高を確認すること。")
+    elif est["usd"]:
+        print("   このモデルは従量課金。回す前に残高を確認すること。")
 
 
 def format_cost(record: RunRecord, path: Path = LOG_PATH) -> str:
@@ -165,8 +184,12 @@ def format_cost(record: RunRecord, path: Path = LOG_PATH) -> str:
     tot = totals(path)
     if usd is None:
         now = "単価不明（トークンのみ記録）"
-    elif usd == 0:
+    elif is_local(record.model):
         now = "0円（ローカル実行）"
+    elif record.model in FREE_TIER:
+        now = f"0円（{FREE_TIER[record.model]}を消費）"
+    elif usd == 0:
+        now = "0円"
     else:
         now = f"${usd:.4f}（約{yen(usd)}円）"
     after = f"累計 {tot['runs']}回・約${tot['usd']:.2f}（約{yen(tot['usd']):,.0f}円）"
