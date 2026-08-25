@@ -79,9 +79,15 @@ Claude Code から使うには、このディレクトリで起動すれば `.mc
 }
 ```
 
-Windows のパスを書くときは `\` で区切ること（`"C:\projects\kaigo_mcp"`）。
-JSON では `\p` が不正なエスケープになり、設定ファイルごと読めなくなる。
-このリポジトリの `.mcp.json` は実際にそれで壊れていた。
+Windows のパスは、区切りをバックスラッシュ2つで書くこと。
+
+```json
+"cwd": "C:\\projects\\kaigo_mcp"
+```
+
+1つだと JSON の不正なエスケープ（`\p`）になり、**設定ファイルごと読めなくなる**。
+このリポジトリの `.mcp.json` は実際にそれで壊れていて、
+Claude Code から一度も読み込めていなかった。
 
 ## エージェント
 
@@ -308,5 +314,14 @@ evalまで通して分かったのは、**同じモデル・同じ重みで、
 
 ## 関連
 
-- [kaigo_matching](https://github.com/ossudesu-lab/kaigo_matching) — 介護記録の構造化抽出（案1）
-- kaigo_gap_analysis — 保険者別の需給ギャップ分析（案4・このデータの出所）
+### この計測を書いた記事
+
+- [ローカルLLMは力不足だと思っていた。同じ重みのまま、設定ひとつで83%が100%になった](https://zenn.dev/ossudesu/articles/zenn-local-agent-numctx-article)
+
+`num_ctx` が正答率の設定でもあったこと、空答えを「完走」と数えていた計測の欠陥を、
+このリポジトリの実測をもとに書いている。
+
+### 同じ作者の関連プロジェクト
+
+- [kaigo_gap_analysis](https://github.com/ossudesu-lab/kaigo_gap_analysis) — 保険者別の需給ギャップ分析（**このデータの出所**）
+- [kaigo_matching](https://github.com/ossudesu-lab/kaigo_matching) — 介護記録から8項目を構造化して取り出すパイプライン
