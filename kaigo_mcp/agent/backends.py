@@ -14,6 +14,7 @@ import json
 import os
 from typing import Any
 
+from .credit_recorder import record_usage
 from .types import Reply, ToolCall, ToolSpec, Turn
 
 
@@ -22,6 +23,18 @@ class BackendError(RuntimeError):
 
 
 # ---------------------------------------------------------------- Anthropic
+
+
+def _record_in_background(model: str, usage: Any) -> None:
+    """使用量を credit_watch に記録する（Anthropic の残高を使う列だけ）。
+
+    別スレッドで送るのは、eval の「秒」に記録の往復時間を混ぜないため。
+    daemon にしないので、プロセスの終了前に送り終わる（失敗しても1.5秒で打ち切り）。
+    環境変数（.env の KV_REST_API_URL など）が無ければ何もしない。
+    """
+    import threading
+
+    threading.Thread(target=record_usage, args=(model, usage), daemon=False).start()
 
 
 class AnthropicBackend:
@@ -100,6 +113,7 @@ class AnthropicBackend:
             tools=self._tools(tools),
             messages=self._messages(history),
         )
+        _record_in_background(self.model, res.usage)
         text = "".join(b.text for b in res.content if b.type == "text")
         calls = [
             ToolCall(id=b.id, name=b.name, arguments=dict(b.input))
