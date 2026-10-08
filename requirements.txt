@@ -1,5 +1,8 @@
 mcp>=2.0.0
 
+# 法令の埋め込み検索（kaigo_mcp/law_search.py）で使う。BM25だけなら不要。
+numpy>=2.0.0
+
 # エージェント（Phase 2）で使う。サーバー単体には不要。
 anthropic>=1.0.0
 openai>=3.0.0

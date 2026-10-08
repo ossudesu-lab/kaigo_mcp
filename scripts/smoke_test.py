@@ -29,12 +29,23 @@ CASES = [
     # 特養定員0。同率90件の注記が付くこと。
     ("rank_insurers", {"pref": "青森県", "order": "low", "limit": 2}, "保険者"),
     ("rank_insurers", {"order": "bogus"}, "エラー"),
+    ("search_regulations", {"query": "身体拘束はどんなときならしていい？"}, "条文"),
 ]
 
+# 検索方式を確かめる追加検証。(引数, 検索方式に含まれるべき語)
+LAW_MODE = [({"query": "身体拘束はどんなときならしていい？", "limit": 3}, "埋め込み")]
+LAW_MODE_FALLBACK = [({"query": "身体拘束はどんなときならしていい？", "limit": 3}, "BM25")]
 
-async def main() -> int:
+
+async def run(env: dict[str, str] | None, cases, law_mode) -> int:
+    """サーバーを1回起動して、道具の応答を確かめる。env は子プロセスへ追加する環境変数。"""
+    import os
+
     params = StdioServerParameters(
-        command=sys.executable, args=["-m", "kaigo_mcp"], cwd=str(ROOT)
+        command=sys.executable,
+        args=["-m", "kaigo_mcp"],
+        cwd=str(ROOT),
+        env={**os.environ, **(env or {})},
     )
     failures = 0
     async with stdio_client(params) as (read, write):
@@ -50,7 +61,7 @@ async def main() -> int:
                     print(f"  NG {t.name}: 説明文が無い（LLMが選べない）")
                     failures += 1
 
-            for name, args, must_have in CASES:
+            for name, args, must_have in cases:
                 result = await session.call_tool(name, args)
                 body = result.structured_content or {}
                 ok = must_have in body
@@ -59,6 +70,24 @@ async def main() -> int:
                     print(json.dumps(body, ensure_ascii=False)[:300])
                     failures += 1
 
+            for args, word in law_mode:
+                body = (await session.call_tool("search_regulations", args)).structured_content or {}
+                ok = word in body.get("検索方式", "") and len(body.get("条文", [])) == args["limit"]
+                print(f"  {'OK' if ok else 'NG'} search_regulations 方式={body.get('検索方式')} (期待: {word})")
+                if not ok:
+                    print(json.dumps(body, ensure_ascii=False)[:300])
+                    failures += 1
+    return failures
+
+
+async def main() -> int:
+    print("== 通常（Ollamaあり）")
+    failures = await run(None, CASES, LAW_MODE)
+    # Ollama に繋がらないとき、道具が落ちず BM25 に退避すること。
+    print("\n== Ollama に繋がらない場合")
+    failures += await run(
+        {"KAIGO_OLLAMA_URL": "http://127.0.0.1:1"}, [("get_national_baseline", {}, "保険者数")], LAW_MODE_FALLBACK
+    )
     print(f"\n{'すべて通過' if failures == 0 else f'{failures}件 失敗'}")
     return 1 if failures else 0
 

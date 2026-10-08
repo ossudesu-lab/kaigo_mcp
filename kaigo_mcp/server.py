@@ -19,7 +19,7 @@ from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
-from . import gap_data
+from . import gap_data, law_search
 
 server = MCPServer(
     name="kaigo-gap",
@@ -27,6 +27,7 @@ server = MCPServer(
     instructions=(
         "日本の介護保険の需給データ（2020年度・全1,571保険者）を引くための道具。"
         "特別養護老人ホームの定員が、要介護3以上の認定者に対してどれだけあるかを調べられる。"
+        "あわせて、介護保険法と特養の運営基準の条文も検索できる。"
     ),
 )
 
@@ -140,6 +141,42 @@ def rank_insurers(
         "件数": len(rows),
         "保険者": [_format(r) for r in rows],
     }
+
+
+@server.tool(
+    description=(
+        "介護保険法と、特別養護老人福祉施設（指定介護老人福祉施設）の運営基準（省令）の条文を検索し、"
+        "該当しそうな条文を出典つきで返す。制度・基準・手続を聞かれたときに使う。"
+        "検索語は短い名詞でなく、質問の言い方のままでよい。"
+        "取得しているのはこの2本の本則だけで、ショートステイ・老健・小規模多機能など"
+        "他のサービスの基準、通知、介護報酬の告示は含まない。"
+        "法令は数字を省令・政令・告示に委ねていることが多く、返った条文に書かれていない数字は"
+        "「この範囲には載っていない」と答えること。"
+        "返った条文から答えるときは、出典（法令名・条・項）を添えること。"
+    )
+)
+def search_regulations(query: str, limit: int = 5) -> dict[str, Any]:
+    limit = max(1, min(limit, 10))
+    try:
+        results, mode = law_search.get_searcher().search(query, limit)
+    except FileNotFoundError as e:
+        return {"エラー": str(e)}
+    out: dict[str, Any] = {
+        "検索方式": mode,
+        "条文": [
+            {
+                "出典": c.ref,
+                "所属": c.section,
+                "本文": c.text,
+            }
+            for c, _ in results
+        ],
+        # いつの条文かを答えに出せるよう、施行日を添える。
+        "対象": [f"{m['title']}（{m['enforced']}施行）" for m in law_search.corpus_info()],
+    }
+    if not results:
+        out["補足"] = "一致する条文が無い。言い換えて再検索するか、この範囲には載っていないと答えること。"
+    return out
 
 
 def main() -> None:

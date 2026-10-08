@@ -264,6 +264,50 @@ PARAMETER num_ctx 8192
 
 つまり**このマシンで測り直すときは、これからも必ず2本とも回す。**
 
+## 2-4. 法令検索（search_regulations）のエージェントeval（0円・GPU機）
+
+メイン機はCPUのみで9Bを回せないので、ここでやる。**質問は10ケース × 3周 = 30回、無料。**
+
+```
+git pull
+pip install -r requirements.txt          # numpy が増えた
+python scripts/fetch_laws.py             # 法令の取得（data/laws.json。git管理外）
+ollama pull bge-m3                       # 埋め込みモデル（約1.2GB）
+python scripts/eval_retrieval.py         # 初回のみ埋め込みを作る。GPUなら数分のはず
+python scripts/smoke_test.py             # 「すべて通過」を確認してから先へ
+```
+
+> メイン機（CPUのみ）では埋め込みの作成に約45分かかった。GPU機で何分かかったかも控える
+> （記事に書く数字）。`data/embeddings-bge-m3.npz` は git 管理外なので、各機で作る。
+
+走らせる（**4k と 8k の両方**。2-3 の決定どおり）:
+
+```
+python scripts/eval_agent.py --cases eval-cases-law.json --column B-local-gpu --runs 3
+python scripts/eval_agent.py --cases eval-cases-law.json --column B-local-gpu-ctx8k --runs 3
+```
+
+**4k は落ちる見込み。** 検索の応答は条文を最大5件（1件あたり最大約1,000文字）返すので、
+それだけで約3,000トークンを使う。4k で `truncated` が出たら、それ自体が結果（`num_ctx` が
+正答率を決める、の再現）。無理に直さず、そのまま数字に残す。
+
+判定を直すときは走らせ直さず、`--cases` を付けて再採点する:
+
+```
+python scripts/eval_agent.py --cases eval-cases-law.json --rescore eval-results/<列>-<日時>.json
+```
+
+### 持ち帰る数字
+
+- 正答 / 完走（各 ○/30）と、全周合格（○/10ケース）。指示追従は出ない（この群には無関係）
+- 1問の秒数の中央値
+- **落ちたケースの答え**（画面に出る）。特に `law-yuko-kikan`（載っていない数字）と
+  `law-ss-isha` / `law-roken-isha`（範囲外）は、判定が粗いので**目で読む**
+- 既存6ケースの回帰: `python scripts/eval_agent.py --column B-local-gpu-ctx8k --runs 3` も回し、
+  道具が3つから4つに増えて崩れていないか（A・B'の既存数字 100% と比べる）
+
+---
+
 ## 3. 結果の持ち帰り方
 
 `.agent-usage.jsonl` に実行記録が溜まるが、**これは .gitignore されている**

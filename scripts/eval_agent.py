@@ -202,7 +202,9 @@ async def run_all(
     return results
 
 
-def summarize(results: list[CaseResult], cases: list[dict], runs: int) -> int:
+def summarize(
+    results: list[CaseResult], cases: list[dict], runs: int, track_follow: bool = True
+) -> int:
     print()
     print("=" * 60)
     by_case: dict[str, list[CaseResult]] = {}
@@ -231,7 +233,9 @@ def summarize(results: list[CaseResult], cases: list[dict], runs: int) -> int:
     print()
     print(f"  正答       {passed}/{total_runs} = {passed / total_runs:.0%}")
     print(f"  完走       {answered}/{total_runs} = {answered / total_runs:.0%}")
-    print(f"  指示追従   {followed}/{total_runs} = {followed / total_runs:.0%}")
+    # 全国基準値を先に引く指示は、需給データの質問にしか当てはまらない。
+    if track_follow:
+        print(f"  指示追従   {followed}/{total_runs} = {followed / total_runs:.0%}")
     print(f"  全周合格   {stable}/{len(cases)} ケース（{runs}周すべて通った）")
 
     tok_in = sum(r.record.input_tokens for r in results if r.record)
@@ -248,11 +252,18 @@ def summarize(results: list[CaseResult], cases: list[dict], runs: int) -> int:
 
 
 def main() -> int:
+    global CASES_PATH
     parser = argparse.ArgumentParser()
     parser.add_argument("--column", default="A-local-cpu")
     parser.add_argument("--runs", type=int, default=3, help="1ケースあたりの周回数")
     parser.add_argument("--max-steps", type=int, default=DEFAULT_MAX_STEPS)
     parser.add_argument("--case", help="このIDのケースだけ走らせる")
+    parser.add_argument(
+        "--cases",
+        type=Path,
+        default=CASES_PATH,
+        help="ケース定義のJSON（既定: eval-cases.json。法令検索は eval-cases-law.json）",
+    )
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument(
         "--rescore", type=Path, help="保存済みの結果を、いまの判定で採点し直す（無料）"
@@ -261,10 +272,12 @@ def main() -> int:
         "--yes", action="store_true", help="課金の発生する列を実際に走らせる"
     )
     args = parser.parse_args()
+    CASES_PATH = args.cases  # load_results も同じ定義を読む
 
     load_env_checked()  # 課金列のキーは .env から読む
 
     data_all = json.loads(CASES_PATH.read_text(encoding="utf-8"))
+    track_follow = data_all.get("track_baseline_follow", True)
     if args.rescore:
         # モデルを回さない。判定を直したときはこちらで確かめる。
         results = load_results(args.rescore)
@@ -282,6 +295,7 @@ def main() -> int:
             results,
             [c for c in data_all["cases"] if c["id"] in ids],
             max(counts) if counts else 0,
+            track_follow,
         )
 
     data = json.loads(CASES_PATH.read_text(encoding="utf-8"))
@@ -321,7 +335,7 @@ def main() -> int:
     saved = save_results(args.column, results)
     print(f"\n結果を保存: {saved.relative_to(ROOT)}")
     print("  判定を直したら --rescore で採点し直せる（課金なし）")
-    return summarize(results, cases, args.runs)
+    return summarize(results, cases, args.runs, track_follow)
 
 
 if __name__ == "__main__":
